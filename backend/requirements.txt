@@ -1,0 +1,22 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+langchain>=0.1.0
+langchain-community>=0.0.20
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+langchain-ollama>=0.1.0
+pandas>=2.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+requests>=2.31.0
+pytest>=7.4.0
+
+# GPU Support (optional but recommended)
+# By default this installs CPU-only PyTorch
+# For NVIDIA GPU support, run after installation:
+# pip install torch --index-url https://download.pytorch.org/whl/cu118
+torch>=2.0.0
+tqdm>=4.65.0
