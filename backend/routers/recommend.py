@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from datetime import datetime
 from models import RecommendationRequest, RecommendationResponse, AnimeMetadata
 from services import rag_service, llm_service
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -63,6 +65,81 @@ async def get_recommendations(request: RecommendationRequest) -> RecommendationR
         raise
     except Exception as e:
         logger.error(f"[RECOMMEND] Unexpected error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while processing your request. Please try again."
+        )
+
+
+@router.post("/recommend-stream")
+async def get_recommendations_stream(request: RecommendationRequest):
+    """Get anime recommendations with streaming explanation (Server-Sent Events)"""
+    try:
+        # Input validation
+        if not request.query or not request.query.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Query cannot be empty"
+            )
+
+        if request.max_results < 1 or request.max_results > 50:
+            raise HTTPException(
+                status_code=400,
+                detail="max_results must be between 1 and 50"
+            )
+
+        query = request.query.strip()
+        logger.info(f"[RECOMMEND-STREAM] Query: {query[:50]}, Max results: {request.max_results}")
+
+        # Search for similar anime
+        retrieved_anime = rag_service.search(query, k=request.max_results)
+
+        if not retrieved_anime:
+            logger.warning(f"[RECOMMEND-STREAM] No anime found for query: {query}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No anime found matching '{query}'. Try different keywords like genres, themes, or character types."
+            )
+
+        # Format anime list for response
+        anime_list = [AnimeMetadata(**anime) for anime in retrieved_anime]
+
+        # Prepare initial response data (anime list)
+        initial_data = {
+            "query": query,
+            "retrieved_anime": [anime.dict() for anime in anime_list],
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Generator function for streaming
+        async def event_generator():
+            try:
+                # First, send the anime list
+                yield f"data: {json.dumps({'type': 'anime_list', 'data': initial_data})}\n\n"
+
+                # Then stream the explanation
+                yield f"data: {json.dumps({'type': 'explanation_start'})}\n\n"
+
+                full_explanation = ""
+                for token in llm_service.stream_recommendations(query, retrieved_anime):
+                    full_explanation += token
+                    # Send each token as SSE
+                    yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+
+                # Signal completion
+                yield f"data: {json.dumps({'type': 'done', 'explanation': full_explanation})}\n\n"
+                logger.info(f"[RECOMMEND-STREAM] Streaming complete for: {query[:50]}")
+
+            except Exception as e:
+                logger.error(f"[RECOMMEND-STREAM] Streaming error: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[RECOMMEND-STREAM] Unexpected error: {e}")
         raise HTTPException(
             status_code=500,
             detail="An unexpected error occurred while processing your request. Please try again."

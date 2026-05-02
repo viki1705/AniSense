@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader, AlertCircle } from 'lucide-react'
+import { useChat } from '../contexts/ChatContext'
 import RecommendationCard from './RecommendationCard'
 
-export default function ChatInterface({ onSendMessage }) {
-  const [messages, setMessages] = useState([])
+export default function ChatInterface({ onSendMessage, onSendMessageStream }) {
+  const { messages, addMessage, updateMessageById } = useChat()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef(null)
@@ -31,26 +32,82 @@ export default function ChatInterface({ onSendMessage }) {
       content: input,
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    addMessage(userMessage)
     setInput('')
     setLoading(true)
 
     try {
-      const response = await onSendMessage(input)
-      const assistantMessage = {
-        id: Date.now() + 1,
-        type: 'assistant',
-        content: response.explanation,
-        anime: response.retrieved_anime,
+      // Try streaming if available
+      if (onSendMessageStream) {
+        let animeList = []
+        let assistantMessageId = Date.now() + 1
+        let explanation = ''
+        let isStreaming = false
+
+        // Create initial empty assistant message
+        addMessage({
+          id: assistantMessageId,
+          type: 'assistant',
+          content: '',
+          anime: [],
+          isStreaming: true,
+        })
+
+        for await (const event of onSendMessageStream(input)) {
+          if (event.type === 'anime_list') {
+            // Display anime list immediately
+            animeList = event.data.retrieved_anime || []
+            updateMessageById(assistantMessageId, {
+              anime: animeList,
+              isStreaming: true,
+            })
+            isStreaming = true
+          } else if (event.type === 'token') {
+            // Append token to explanation in real-time
+            explanation += event.token
+            updateMessageById(assistantMessageId, { content: explanation })
+          } else if (event.type === 'done') {
+            // Mark streaming as complete
+            updateMessageById(assistantMessageId, { isStreaming: false })
+          } else if (event.type === 'error') {
+            // Stream error - create error message
+            throw new Error(event.message || 'Streaming error occurred')
+          } else if (event.type === 'fallback') {
+            // Fallback from non-streaming
+            const response = event.data
+            if (!response.retrieved_anime || response.retrieved_anime.length === 0) {
+              throw new Error('No anime found for your query. Try another search.')
+            }
+            updateMessageById(assistantMessageId, {
+              content: response.explanation,
+              anime: response.retrieved_anime,
+              isStreaming: false,
+            })
+          }
+        }
+
+        // Ensure message is marked as not streaming at the end
+        if (isStreaming && explanation) {
+          updateMessageById(assistantMessageId, { isStreaming: false })
+        }
+      } else {
+        // Fallback to non-streaming if streaming not available
+        const response = await onSendMessage(input)
+        const assistantMessage = {
+          id: Date.now() + 1,
+          type: 'assistant',
+          content: response.explanation,
+          anime: response.retrieved_anime,
+        }
+        addMessage(assistantMessage)
       }
-      setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
         type: 'error',
         content: error.message || 'Sorry, I encountered an error. Please try again.',
       }
-      setMessages((prev) => [...prev, errorMessage])
+      addMessage(errorMessage)
       console.error('Send message error:', error)
     } finally {
       setLoading(false)
@@ -86,16 +143,27 @@ export default function ChatInterface({ onSendMessage }) {
                 <AlertCircle className="flex-shrink-0 mt-0.5" size={20} />
               )}
               <div className="flex-1">
-                <p>{message.content}</p>
+                {message.type === 'assistant' && message.content && (
+                  <div>
+                    <p className="text-sm font-semibold text-accent-cyan mb-2">Why they are recommended?</p>
+                    <p>{message.content}</p>
+                  </div>
+                )}
+
+                {message.type === 'user' && (
+                  <p>{message.content}</p>
+                )}
 
                 {message.anime && message.anime.length > 0 && (
-                  <div className="mt-4 grid grid-cols-1 gap-3">
-                    {message.anime.slice(0, 3).map((anime) => (
-                      <div key={anime.anime_id || anime.title} className="text-xs">
-                        <p className="font-semibold text-white">{anime.title}</p>
-                        <p>{anime.rating?.toFixed(2)} rating</p>
-                      </div>
-                    ))}
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-accent-cyan mb-3">Here are the top 3 recommendations</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      {message.anime.slice(0, 3).map((anime, index) => (
+                        <div key={anime.anime_id || anime.title} className="text-sm">
+                          <p className="font-semibold text-white">{index + 1}) {anime.title}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

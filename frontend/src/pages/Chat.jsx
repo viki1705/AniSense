@@ -16,9 +16,22 @@ export default function Chat() {
     }
   }
 
+  const handleSendMessageStream = async function* (query) {
+    try {
+      for await (const event of animeAPI.getRecommendationsStream(query, 5)) {
+        yield event
+      }
+    } catch (error) {
+      console.error('Chat streaming error:', error)
+      // Fallback to non-streaming
+      const response = await handleSendMessage(query)
+      yield { type: 'fallback', data: response }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-primary-900">
-      <ChatInterface onSendMessage={handleSendMessage} />
+      <ChatInterface onSendMessage={handleSendMessage} onSendMessageStream={handleSendMessageStream} />
     </div>
   )
 }

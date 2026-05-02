@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     # Ollama Configuration
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
+    ollama_num_ctx: int = 2048
+    ollama_num_predict: int = 128
+    ollama_num_thread: int = 8
+    ollama_keep_alive: str = "30m"
 
     # ChromaDB Configuration
     chromadb_persist_dir: str = "./chroma_db"

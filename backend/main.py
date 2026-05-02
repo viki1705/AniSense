@@ -68,6 +68,11 @@ async def startup_event():
     except Exception as e:
         print(f"[WARN] Embedding model error: {e}")
 
+    # Warm up Ollama model to avoid first-request cold start latency
+    llm_warmed = llm_service.warmup()
+    if not llm_warmed:
+        print("[WARN] LLM warm-up did not complete")
+
     print("[STARTUP] Initialization complete")
 
 

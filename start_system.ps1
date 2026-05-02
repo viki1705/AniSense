@@ -1,7 +1,7 @@
 # AniSense System Startup Script
 # Starts: Ollama, Backend (FastAPI), and Frontend (React)
 
-$IMS_DIR = "c:\Users\VIKRAM\Desktop\IMS"
+$IMS_DIR = (Get-Location).Path
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  AniSense - Complete System Startup" -ForegroundColor Cyan
@@ -27,7 +27,18 @@ Start-InTerminal "Ollama Server" "ollama serve" $IMS_DIR
 
 # 2. Start Backend (FastAPI)
 Write-Host "[2/3] Starting Backend (FastAPI)..." -ForegroundColor Green
-$backendCmd = "python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+$pythonExe = Join-Path $IMS_DIR ".venv\Scripts\python.exe"
+if (-not (Test-Path $pythonExe)) {
+    $pythonExe = Join-Path $IMS_DIR "venv\Scripts\python.exe"
+}
+
+if (-not (Test-Path $pythonExe)) {
+    Write-Host "[ERROR] Python virtual environment not found at .venv or venv" -ForegroundColor Red
+    Write-Host "Create one with: py -m venv .venv" -ForegroundColor Yellow
+    exit 1
+}
+
+$backendCmd = "& '$pythonExe' -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
 Start-InTerminal "Backend Server" $backendCmd "$IMS_DIR\backend"
 
 # 3. Start Frontend (React + Vite)

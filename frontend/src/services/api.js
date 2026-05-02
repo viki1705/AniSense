@@ -72,6 +72,49 @@ const animeAPI = {
       })
   },
 
+  getRecommendationsStream: async function* (query, maxResults = 5) {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+    try {
+      const response = await fetch(`${API_URL}/api/recommend-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, max_results: maxResults }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value)
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6))
+              yield event
+            } catch (parseError) {
+              console.warn('[STREAM] Failed to parse SSE:', line)
+              continue
+            }
+          }
+        }
+      }
+    } catch (error) {
+      throw new Error(getUserFriendlyError(error))
+    }
+  },
+
   searchAnime: async (title) => {
     return retryRequest(() =>
       api.get(`/api/search/${encodeURIComponent(title)}`)

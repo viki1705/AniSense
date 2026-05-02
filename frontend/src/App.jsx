@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useUser } from './contexts/UserContext'
+import { ChatProvider } from './contexts/ChatContext'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Chat from './pages/Chat'
@@ -93,7 +94,9 @@ function App() {
   return (
     <BrowserRouter>
       <UserProvider>
-        <AppContent />
+        <ChatProvider>
+          <AppContent />
+        </ChatProvider>
       </UserProvider>
     </BrowserRouter>
   )

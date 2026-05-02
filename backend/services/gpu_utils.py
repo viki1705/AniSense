@@ -1,4 +1,5 @@
 """GPU detection and configuration utilities"""
+
 import os
 import sys
 from typing import Dict, Any, Optional

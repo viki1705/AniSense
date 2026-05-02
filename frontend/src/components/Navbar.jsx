@@ -29,8 +29,7 @@ export default function Navbar() {
     <nav className="bg-primary-800 border-b border-accent-purple/20 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition">
-          <span className="text-2xl">🎌</span>
-          <span className="text-xl font-bold gradient-text">AniSense</span>
+          <span className="text-3xl font-bold gradient-text">AniSense</span>
         </Link>
 
         <div className="flex items-center gap-1">
